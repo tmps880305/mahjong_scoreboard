@@ -6,6 +6,7 @@ import 'dart:math' show pi;
 
 import '../widgets/center_pad.dart';
 import '../widgets/player_card.dart';
+import '../widgets/settings_menu.dart';
 
 class MahjongScoreboardApp extends StatelessWidget {
   const MahjongScoreboardApp({super.key});
@@ -478,24 +479,7 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
             ),
           ),
           // Bottom right settings button
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: PopupMenuButton<String>(
-              icon: const Icon(Icons.settings, color: Colors.white, size: 32),
-              onSelected: (value) {
-                if (value == 'new_game') {
-                  _resetGame(); // call reset function we wrote earlier
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem<String>(
-                  value: 'new_game',
-                  child: Text('New Game'),
-                ),
-              ],
-            ),
-          ),
+          SettingsMenu(onNewGame: _resetGame),
         ],
       ),
     );
