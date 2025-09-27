@@ -42,6 +42,12 @@ class GameStorage {
       'riichiSticks': prefs.getInt('riichiSticks') ?? 0,
       'currentRound': prefs.getString('currentRound') ?? '東1局',
       'honba': prefs.getInt('honba') ?? 0,
+      'seatWind': {
+        'bottom': prefs.getString('wind_bottom') ?? '東',
+        'right': prefs.getString('wind_right') ?? '南',
+        'top': prefs.getString('wind_top') ?? '西',
+        'left': prefs.getString('wind_left') ?? '北',
+      },
     };
   }
 

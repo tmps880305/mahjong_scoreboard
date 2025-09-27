@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mahjong_scoreboard/services/game_service.dart';
 import 'package:mahjong_scoreboard/utils/dialog_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mahjong_scoreboard/services/game_storage.dart';
+import 'package:mahjong_scoreboard/widgets/center_pad.dart';
+import 'package:mahjong_scoreboard/widgets/player_card.dart';
+import 'package:mahjong_scoreboard/widgets/scoring_dialog.dart';
+import 'package:mahjong_scoreboard/widgets/settings_menu.dart';
 import 'dart:math' show pi;
-
-import '../services/game_storage.dart';
-import '../widgets/center_pad.dart';
-import '../widgets/player_card.dart';
-import '../widgets/scoring_dialog.dart';
-import '../widgets/settings_menu.dart';
 
 class MahjongScoreboardApp extends StatelessWidget {
   const MahjongScoreboardApp({super.key});
@@ -115,61 +115,12 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
     super.initState();
     // Lock orientation to portrait
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    _loadData().then((_) => _ensureFirstBootInitialized());
+    GameService.loadData().then(
+      (_) => GameService.ensureFirstBootInitialized(),
+    );
   }
 
-  Future<void> _ensureFirstBootInitialized() async {
-    final prefs = await SharedPreferences.getInstance();
-    final initialized = prefs.getBool('initialized') ?? false;
-    if (!initialized) {
-      setState(() {
-        scores = {'bottom': 25000, 'right': 25000, 'top': 25000, 'left': 25000};
-        riichiStatus = {
-          'bottom': false,
-          'right': false,
-          'top': false,
-          'left': false,
-        };
-        names = {
-          'bottom': 'プレイヤー1',
-          'right': 'プレイヤー2',
-          'top': 'プレイヤー3',
-          'left': 'プレイヤー4',
-        };
-        seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
-        currentRound = '東1局';
-        honba = 0;
-        riichiSticks = 0;
-      });
-      await _saveData();
-    }
-  }
-
-  Future<void> _resetGame() async {
-    setState(() {
-      scores = {'bottom': 25000, 'right': 25000, 'top': 25000, 'left': 25000};
-      riichiStatus = {
-        'bottom': false,
-        'right': false,
-        'top': false,
-        'left': false,
-      };
-      names = {
-        'bottom': 'プレイヤー1',
-        'right': 'プレイヤー2',
-        'top': 'プレイヤー3',
-        'left': 'プレイヤー4',
-      };
-      seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
-      currentRound = '東1局';
-      honba = 0;
-      riichiSticks = 0;
-    });
-    await _saveData();
-  }
-
-  Future<void> _loadData() async {
-    final data = await GameStorage.load();
+  void _applyLoadedData(Map<String, dynamic> data) {
     setState(() {
       scores = Map<String, int>.from(data['scores']);
       names = Map<String, String>.from(data['names']);
@@ -177,19 +128,13 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
       riichiSticks = data['riichiSticks'];
       currentRound = data['currentRound'];
       honba = data['honba'];
+      seatWind = Map<String, String>.from(data['seatWind']);
     });
   }
 
-  Future<void> _saveData() async {
-    await GameStorage.save(
-      scores: scores,
-      names: names,
-      riichiStatus: riichiStatus,
-      riichiSticks: riichiSticks,
-      currentRound: currentRound,
-      honba: honba,
-      seatWind: seatWind,
-    );
+  Future<void> _resetGame() async {
+    final data = await GameService.resetGame();
+    _applyLoadedData(data);
   }
 
   Future<void> _toggleRiichi(String seat) async {
@@ -283,7 +228,15 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
     setState(() {
       names[seatPos] = newName;
     });
-    await _saveData(); // you already persist names seat-based
+    GameService.saveData(
+      scores: scores,
+      names: names,
+      riichiStatus: riichiStatus,
+      riichiSticks: riichiSticks,
+      currentRound: currentRound,
+      honba: honba,
+      seatWind: seatWind,
+    );
   }
 
   @override
@@ -485,7 +438,15 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         }
       });
 
-      _saveData();
+      GameService.saveData(
+        scores: scores,
+        names: names,
+        riichiStatus: riichiStatus,
+        riichiSticks: riichiSticks,
+        currentRound: currentRound,
+        honba: honba,
+        seatWind: seatWind,
+      );
     }
 
     void _processScoringTsumo({
@@ -545,7 +506,15 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         }
       });
 
-      _saveData();
+      GameService.saveData(
+        scores: scores,
+        names: names,
+        riichiStatus: riichiStatus,
+        riichiSticks: riichiSticks,
+        currentRound: currentRound,
+        honba: honba,
+        seatWind: seatWind,
+      );
     }
 
     if (result == null) return;

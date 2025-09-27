@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class SettingsMenu extends StatelessWidget {
-  final VoidCallback onNewGame;
+  final Future<void> Function() onNewGame;
 
   const SettingsMenu({super.key, required this.onNewGame});
 
@@ -41,7 +41,10 @@ class SettingsMenu extends StatelessWidget {
                   ),
                   const PopupMenuItem(
                     value: 'default_player',
-                    child: Text('Default Player', style: TextStyle(fontSize: 24)),
+                    child: Text(
+                      'Default Player',
+                      style: TextStyle(fontSize: 24),
+                    ),
                   ),
                   const PopupMenuItem(
                     value: 'game_setting',
@@ -52,7 +55,8 @@ class SettingsMenu extends StatelessWidget {
               );
 
               if (value == 'new_game') {
-                onNewGame();
+                print('[SettingsMenu] New game clicked');
+                await onNewGame();
               } else if (value == 'default_player') {
                 // TODO: Implement reset to default players
                 ScaffoldMessenger.of(context).showSnackBar(
