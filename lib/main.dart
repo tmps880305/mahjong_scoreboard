@@ -436,7 +436,11 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         }
       }
 
-      String? selectedLoser; // radio selection
+      final pointsCtrl = TextEditingController();
+      final tsumoDealerCtrl =
+          TextEditingController(); // shown only when winner NOT dealer
+      String? selected; // radio selection
+      final isWinnerDealer = (seatWind[winnerSeat] == '東');
 
       final controller = TextEditingController();
 
@@ -448,46 +452,57 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
-                title: Text('得点入力 - $winnerWind 勝ち'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        hintText: '点数を入力してください',
+                title: Text('得点入力 - ${seatWind[winnerSeat]} 勝ち'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Base points (always visible)
+                      TextField(
+                        controller: pointsCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '点数（基本）',
+                          hintText: 'ロン / 親ツモ',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Radio options
-                    Column(
-                      children: [
-                        // Generate radios for other winds
-                        ...seatWind.entries
-                            .where((e) => e.key != winnerSeat) // exclude winner
-                            .map((e) {
-                              return RadioListTile<String>(
-                                title: Text(e.value), // wind label (東南西北)
-                                value: e.key, // use seatPos as value
-                                groupValue: selectedLoser,
-                                onChanged: (val) {
-                                  setState(() => selectedLoser = val);
-                                },
-                              );
-                            }),
-                        // Add ツモ option
-                        RadioListTile<String>(
-                          title: const Text('ツモ'),
-                          value: 'tsumo',
-                          groupValue: selectedLoser,
-                          onChanged: (val) {
-                            setState(() => selectedLoser = val);
-                          },
+
+                      // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
+                      if (selected == 'tsumo' && !isWinnerDealer) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: tsumoDealerCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: '点数',
+                            hintText: '親が支払う点数',
+                          ),
                         ),
                       ],
-                    ),
-                  ],
+
+                      const SizedBox(height: 16),
+
+                      // Radios: other seats + ツモ
+                      const Text('支払い元', style: TextStyle(color: Colors.black)),
+                      ...seatWind.entries
+                          .where((e) => e.key != winnerSeat) // exclude winner
+                          .map(
+                            (e) => RadioListTile<String>(
+                              title: Text(e.value), // wind (東南西北)
+                              value: e.key, // seatPos
+                              groupValue: selected,
+                              onChanged: (v) => setState(() => selected = v),
+                            ),
+                          ),
+                      RadioListTile<String>(
+                        title: const Text('ツモ'),
+                        value: 'tsumo',
+                        groupValue: selected,
+                        onChanged: (v) => setState(() => selected = v),
+                      ),
+                    ],
+                  ),
                 ),
                 actions: [
                   TextButton(
@@ -496,11 +511,30 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      final points = int.tryParse(controller.text);
-                      if (points != null && selectedLoser != null) {
+                      final base = int.tryParse(pointsCtrl.text);
+                      if (selected == null || base == null) return;
+
+                      if (selected == 'tsumo') {
+                        // ツモ
+                        final payload = <String, dynamic>{
+                          'mode': 'tsumo',
+                          'base': base,
+                        };
+                        if (!isWinnerDealer) {
+                          // needs dealer amount
+                          final dealerAmt = int.tryParse(
+                            tsumoDealerCtrl.text ?? '',
+                          );
+                          if (dealerAmt == null) return; // invalid; do nothing
+                          payload['dealer'] = dealerAmt;
+                        }
+                        Navigator.pop(context, payload);
+                      } else {
+                        // RON vs selected loser seat
                         Navigator.pop(context, {
-                          'points': points,
-                          'loser': selectedLoser,
+                          'mode': 'ron',
+                          'base': base,
+                          'loser': selected, // seatPos
                         });
                       }
                     },
@@ -527,30 +561,89 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         currentRound = '$wind${num}局';
       }
 
-      void _processScoring(String winnerSeat, int winPoints, String loser) {
+      void _processScoringRon({
+        required String winnerSeat, // 'bottom'|'right'|'top'|'left'
+        required int points,
+        required String loserSeat, // seatPos
+      }) {
         final dealer = dealerSeat;
-        final isDealer = winnerSeat == dealer;
+        final dealerWon = (winnerSeat == dealer);
 
         setState(() {
-          final riichiBonus = riichiSticks * 1000;
+          // Winner gets points + all riichi sticks
+          final bonus = riichiSticks * 1000;
+          scores[winnerSeat] = (scores[winnerSeat] ?? 0) + points + bonus;
 
-          // Add to winner
-          scores[winnerSeat] =
-              (scores[winnerSeat] ?? 0) + winPoints + riichiBonus;
+          // Loser pays points
+          scores[loserSeat] = (scores[loserSeat] ?? 0) - points;
 
-          // Deduct from loser (if not tsumo)
-          if (loser != 'tsumo') {
-            scores[loser] = (scores[loser] ?? 0) - winPoints;
-          }
-          // If tsumo → TODO: apply split payment logic (currently just ignore)
-
-          // Clear riichi sticks
+          // Reset riichi
           riichiSticks = 0;
           riichiStatus.updateAll((k, v) => false);
 
-          if (isDealer) {
-            honba += 1;
-            // 局 stays the same
+          // Round/dealer rules
+          if (dealerWon) {
+            honba += 1; // same 局, dealer stays
+          } else {
+            honba = 0;
+            _advanceRound();
+            _rotateWindsClockwise(); // dealer passes clockwise
+          }
+        });
+
+        _saveData();
+      }
+
+      void _processScoringTsumo({
+        required String winnerSeat,
+        required int baseForNonDealerOrAll,
+        int? dealerAmountIfNonDealerWins, // null when winner is dealer
+      }) {
+        final dealer = dealerSeat;
+        final winnerIsDealer = (winnerSeat == dealer);
+
+        // Build payer sets
+        final others = [
+          'bottom',
+          'right',
+          'top',
+          'left',
+        ].where((s) => s != winnerSeat).toList();
+
+        setState(() {
+          int totalTaken = 0;
+
+          if (winnerIsDealer) {
+            // All three others pay the same "base"
+            for (final seat in others) {
+              scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+              totalTaken += baseForNonDealerOrAll;
+            }
+          } else {
+            // Winner is NOT dealer:
+            // Two non-dealers (excluding dealer and winner) pay "base"
+            final nonDealerLosers = others.where((s) => s != dealer).toList();
+            for (final seat in nonDealerLosers) {
+              scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+              totalTaken += baseForNonDealerOrAll;
+            }
+            // Dealer pays "dealerAmount"
+            final dealerPay = dealerAmountIfNonDealerWins ?? 0;
+            scores[dealer] = (scores[dealer] ?? 0) - dealerPay;
+            totalTaken += dealerPay;
+          }
+
+          // Winner collects everything + riichi bonus
+          final bonus = riichiSticks * 1000;
+          scores[winnerSeat] = (scores[winnerSeat] ?? 0) + totalTaken + bonus;
+
+          // Reset riichi
+          riichiSticks = 0;
+          riichiStatus.updateAll((k, v) => false);
+
+          // Round/dealer rules:
+          if (winnerIsDealer) {
+            honba += 1; // dealer win → same 局
           } else {
             honba = 0;
             _advanceRound();
@@ -561,10 +654,27 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         _saveData();
       }
 
-      if (result != null) {
-        final points = result['points'] as int;
-        final loser = result['loser'] as String;
-        _processScoring(winnerSeat, points, loser);
+      if (result == null) return;
+
+      // Route to handler
+      final mode = result['mode'] as String;
+      if (mode == 'ron') {
+        _processScoringRon(
+          winnerSeat: winnerSeat,
+          points: result['base'] as int,
+          loserSeat: result['loser'] as String,
+        );
+      } else {
+        // tsumo
+        final base = result['base'] as int;
+        final dealerAmt = result.containsKey('dealer')
+            ? result['dealer'] as int
+            : null;
+        _processScoringTsumo(
+          winnerSeat: winnerSeat,
+          baseForNonDealerOrAll: base,
+          dealerAmountIfNonDealerWins: dealerAmt, // null when winner is dealer
+        );
       }
     }
 
