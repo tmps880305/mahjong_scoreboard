@@ -42,7 +42,7 @@ class ScoreboardScreen extends StatefulWidget {
 }
 
 class _ScoreboardScreenState extends State<ScoreboardScreen> {
-  // Physical seats in clockwise order
+
   final List<String> seatOrder = ['bottom', 'right', 'top', 'left'];
 
   Map<String, String> names = {
