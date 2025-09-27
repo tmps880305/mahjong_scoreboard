@@ -4,6 +4,7 @@ import 'package:mahjong_scoreboard/utils/dialog_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' show pi;
 
+import '../services/game_storage.dart';
 import '../widgets/center_pad.dart';
 import '../widgets/player_card.dart';
 import '../widgets/scoring_dialog.dart';
@@ -168,113 +169,27 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // seat-based names (preferred)
-    final seatNamesExist =
-        prefs.containsKey('name_bottom') ||
-        prefs.containsKey('name_right') ||
-        prefs.containsKey('name_top') ||
-        prefs.containsKey('name_left');
-
-    if (seatNamesExist) {
-      names = {
-        'bottom': prefs.getString('name_bottom') ?? 'プレイヤー1',
-        'right': prefs.getString('name_right') ?? 'プレイヤー2',
-        'top': prefs.getString('name_top') ?? 'プレイヤー3',
-        'left': prefs.getString('name_left') ?? 'プレイヤー4',
-      };
-    } else {
-      // MIGRATION from old wind-based name_東 etc., assuming start mapping
-      names = {
-        'bottom': prefs.getString('name_東') ?? 'プレイヤー1',
-        'right': prefs.getString('name_南') ?? 'プレイヤー2',
-        'top': prefs.getString('name_西') ?? 'プレイヤー3',
-        'left': prefs.getString('name_北') ?? 'プレイヤー4',
-      };
-    }
-
-    // Try seat-based keys first
-    final hasSeatBased =
-        prefs.containsKey('score_bottom') ||
-        prefs.containsKey('score_right') ||
-        prefs.containsKey('score_top') ||
-        prefs.containsKey('score_left');
-
+    final data = await GameStorage.load();
     setState(() {
-      if (hasSeatBased) {
-        // Seat-based load
-        scores = {
-          'bottom': prefs.getInt('score_bottom') ?? 25000,
-          'right': prefs.getInt('score_right') ?? 25000,
-          'top': prefs.getInt('score_top') ?? 25000,
-          'left': prefs.getInt('score_left') ?? 25000,
-        };
-        riichiStatus = {
-          'bottom': prefs.getBool('riichi_bottom') ?? false,
-          'right': prefs.getBool('riichi_right') ?? false,
-          'top': prefs.getBool('riichi_top') ?? false,
-          'left': prefs.getBool('riichi_left') ?? false,
-        };
-
-        // Winds (fallback to default if not saved)
-        seatWind = {
-          'bottom': prefs.getString('wind_bottom') ?? '東',
-          'right': prefs.getString('wind_right') ?? '南',
-          'top': prefs.getString('wind_top') ?? '西',
-          'left': prefs.getString('wind_left') ?? '北',
-        };
-      } else {
-        // MIGRATION: From old wind-based keys to seat-based
-        // Assume default starting assignment bottom=東, right=南, top=西, left=北
-        scores = {
-          'bottom': prefs.getInt('score_東') ?? 25000,
-          'right': prefs.getInt('score_南') ?? 25000,
-          'top': prefs.getInt('score_西') ?? 25000,
-          'left': prefs.getInt('score_北') ?? 25000,
-        };
-        riichiStatus = {
-          'bottom': prefs.getBool('riichi_東') ?? false,
-          'right': prefs.getBool('riichi_南') ?? false,
-          'top': prefs.getBool('riichi_西') ?? false,
-          'left': prefs.getBool('riichi_北') ?? false,
-        };
-        seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
-      }
-
-      // Round info
-      currentRound = prefs.getString('currentRound') ?? '東1局';
-      honba = prefs.getInt('honba') ?? 0;
-      riichiSticks = prefs.getInt('riichiSticks') ?? 0;
+      scores = Map<String, int>.from(data['scores']);
+      names = Map<String, String>.from(data['names']);
+      riichiStatus = Map<String, bool>.from(data['riichiStatus']);
+      riichiSticks = data['riichiSticks'];
+      currentRound = data['currentRound'];
+      honba = data['honba'];
     });
   }
 
   Future<void> _saveData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString('name_bottom', names['bottom'] ?? 'プレイヤー1');
-    await prefs.setString('name_right', names['right'] ?? 'プレイヤー2');
-    await prefs.setString('name_top', names['top'] ?? 'プレイヤー3');
-    await prefs.setString('name_left', names['left'] ?? 'プレイヤー4');
-
-    await prefs.setInt('score_bottom', scores['bottom'] ?? 25000);
-    await prefs.setInt('score_right', scores['right'] ?? 25000);
-    await prefs.setInt('score_top', scores['top'] ?? 25000);
-    await prefs.setInt('score_left', scores['left'] ?? 25000);
-
-    await prefs.setBool('riichi_bottom', riichiStatus['bottom'] ?? false);
-    await prefs.setBool('riichi_right', riichiStatus['right'] ?? false);
-    await prefs.setBool('riichi_top', riichiStatus['top'] ?? false);
-    await prefs.setBool('riichi_left', riichiStatus['left'] ?? false);
-
-    await prefs.setString('wind_bottom', seatWind['bottom'] ?? '東');
-    await prefs.setString('wind_right', seatWind['right'] ?? '南');
-    await prefs.setString('wind_top', seatWind['top'] ?? '西');
-    await prefs.setString('wind_left', seatWind['left'] ?? '北');
-
-    await prefs.setString('currentRound', currentRound);
-    await prefs.setInt('honba', honba);
-    await prefs.setInt('riichiSticks', riichiSticks);
+    await GameStorage.save(
+      scores: scores,
+      names: names,
+      riichiStatus: riichiStatus,
+      riichiSticks: riichiSticks,
+      currentRound: currentRound,
+      honba: honba,
+      seatWind: seatWind,
+    );
   }
 
   Future<void> _toggleRiichi(String seat) async {
