@@ -34,10 +34,18 @@ class SettingsMenu extends StatelessWidget {
               final value = await showMenu<String>(
                 context: context,
                 position: position,
-                items: const [
-                  PopupMenuItem(
+                items: [
+                  const PopupMenuItem(
                     value: 'new_game',
                     child: Text('New Game', style: TextStyle(fontSize: 24)),
+                  ),
+                  const PopupMenuItem(
+                    value: 'default_player',
+                    child: Text('Default Player', style: TextStyle(fontSize: 24)),
+                  ),
+                  const PopupMenuItem(
+                    value: 'game_setting',
+                    child: Text('Game Setting', style: TextStyle(fontSize: 24)),
                   ),
                 ],
                 elevation: 8,
@@ -45,6 +53,16 @@ class SettingsMenu extends StatelessWidget {
 
               if (value == 'new_game') {
                 onNewGame();
+              } else if (value == 'default_player') {
+                // TODO: Implement reset to default players
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Default Player selected')),
+                );
+              } else if (value == 'game_setting') {
+                // TODO: Implement game settings dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Game Setting selected')),
+                );
               }
             },
           );
