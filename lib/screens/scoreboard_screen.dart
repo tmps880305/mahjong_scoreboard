@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mahjong_scoreboard/utils/dialog_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' show pi;
 
@@ -304,33 +305,59 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
   Future<void> _editPlayerName(String seatPos) async {
     final controller = TextEditingController(text: names[seatPos] ?? '');
 
-    final newName = await showDialog<String>(
+    //
+    final newName = await showCustomDialog<String>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('${seatWind[seatPos] ?? ''} の名前を変更'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: 'プレイヤー名',
-              hintText: '名前を入力',
-            ),
-            onSubmitted: (v) => Navigator.pop(context, v.trim()),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.20,
+        vertical: MediaQuery.of(context).size.height * 0.10,
+      ), // same margins as scoring dialog
+      child: SizedBox(
+        width:
+            MediaQuery.of(context).size.width * 0.60, // same width as scoring
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // height fits content
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${seatWind[seatPos] ?? ''} の名前を変更',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'プレイヤー名',
+                  hintText: '名前を入力',
+                ),
+                onSubmitted: (v) => Navigator.pop(context, v.trim()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('キャンセル'),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, controller.text.trim()),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('キャンセル'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
 
     if (newName == null) return; // cancelled
@@ -500,164 +527,152 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
 
     final winnerName = names[winnerSeat] ?? seatWind[winnerSeat] ?? '';
 
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showCustomDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              // margins from the screen edge so the inner box becomes ~40% × 70%
-              insetPadding: EdgeInsets.symmetric(
-                horizontal:
-                    MediaQuery.of(context).size.width *
-                    0.20, // 30% + 30% = 60% margins → 40% width
-                vertical:
-                    MediaQuery.of(context).size.height *
-                    0.10, // 15% + 15% = 30% margins → 70% height
-              ),
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.60,
-                height: MediaQuery.of(context).size.height * 0.80,
-                child: Column(
-                  children: [
-                    // Title (we’ll switch to player name in section B)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Text(
-                        '得点入力', // we’ll append “<player name> 勝ち” below
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          // color: Colors.black,
-                        ),
-                      ),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.20,
+        vertical: MediaQuery.of(context).size.height * 0.10,
+      ),
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          return SizedBox(
+            width: MediaQuery.of(context).size.width * 0.60,
+            height: MediaQuery.of(context).size.height * 0.80,
+            child: Column(
+              children: [
+                // Title (we’ll switch to player name in section B)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    '得点入力', // we’ll append “<player name> 勝ち” below
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      // color: Colors.black,
                     ),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        winnerName,
-                        style: TextStyle(
-                          fontFamily: 'NotoSansJP',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          // color: Colors.black,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                  ),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    winnerName,
+                    style: TextStyle(
+                      fontFamily: 'NotoSansJP',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      // color: Colors.black,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
 
-                    // Scrollable content
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Base points (always visible)
-                            TextField(
-                              controller: pointsCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '点数（基本）',
-                                hintText: 'ロン / 親ツモ',
-                              ),
-                            ),
-
-                            // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
-                            if (selected == 'tsumo' && !isWinnerDealer) ...[
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: tsumoDealerCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: '点数',
-                                  hintText: '親が支払う点数',
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 48),
-                            // Radios: other seats + ツモ
-                            const Text(
-                              '支払い元',
-                              // style: TextStyle(color: Colors.black),
-                            ),
-                            ...seatWind.entries
-                                .where(
-                                  (e) => e.key != winnerSeat,
-                                ) // exclude winner
-                                .map(
-                                  (e) => RadioListTile<String>(
-                                    title: Text(e.value), // wind (東南西北)
-                                    value: e.key, // seatPos
-                                    groupValue: selected,
-                                    onChanged: (v) =>
-                                        setState(() => selected = v),
-                                  ),
-                                ),
-                            RadioListTile<String>(
-                              title: const Text('ツモ'),
-                              value: 'tsumo',
-                              groupValue: selected,
-                              onChanged: (v) => setState(() => selected = v),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Buttons pinned at bottom
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('キャンセル'),
+                // Scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Base points (always visible)
+                        TextField(
+                          controller: pointsCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: '点数（基本）',
+                            hintText: 'ロン / 親ツモ',
                           ),
-                          TextButton(
-                            onPressed: () {
-                              final base = int.tryParse(pointsCtrl.text);
-                              if (selected == null || base == null) return;
+                        ),
 
-                              if (selected == 'tsumo') {
-                                // ツモ
-                                final payload = <String, dynamic>{
-                                  'mode': 'tsumo',
-                                  'base': base,
-                                };
-                                if (!isWinnerDealer) {
-                                  // needs dealer amount
-                                  final dealerAmt = int.tryParse(
-                                    tsumoDealerCtrl.text ?? '',
-                                  );
-                                  if (dealerAmt == null)
-                                    return; // invalid; do nothing
-                                  payload['dealer'] = dealerAmt;
-                                }
-                                Navigator.pop(context, payload);
-                              } else {
-                                // RON vs selected loser seat
-                                Navigator.pop(context, {
-                                  'mode': 'ron',
-                                  'base': base,
-                                  'loser': selected, // seatPos
-                                });
-                              }
-                            },
-                            child: const Text('OK'),
+                        // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
+                        if (selected == 'tsumo' && !isWinnerDealer) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: tsumoDealerCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: '点数',
+                              hintText: '親が支払う点数',
+                            ),
                           ),
                         ],
-                      ),
+
+                        const SizedBox(height: 48),
+                        // Radios: other seats + ツモ
+                        const Text(
+                          '支払い元',
+                          // style: TextStyle(color: Colors.black),
+                        ),
+                        ...seatWind.entries
+                            .where((e) => e.key != winnerSeat) // exclude winner
+                            .map(
+                              (e) => RadioListTile<String>(
+                                title: Text(e.value), // wind (東南西北)
+                                value: e.key, // seatPos
+                                groupValue: selected,
+                                onChanged: (v) => setState(() => selected = v),
+                              ),
+                            ),
+                        RadioListTile<String>(
+                          title: const Text('ツモ'),
+                          value: 'tsumo',
+                          groupValue: selected,
+                          onChanged: (v) => setState(() => selected = v),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+
+                // Buttons pinned at bottom
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          final base = int.tryParse(pointsCtrl.text);
+                          if (selected == null || base == null) return;
+
+                          if (selected == 'tsumo') {
+                            // ツモ
+                            final payload = <String, dynamic>{
+                              'mode': 'tsumo',
+                              'base': base,
+                            };
+                            if (!isWinnerDealer) {
+                              // needs dealer amount
+                              final dealerAmt = int.tryParse(
+                                tsumoDealerCtrl.text ?? '',
+                              );
+                              if (dealerAmt == null)
+                                return; // invalid; do nothing
+                              payload['dealer'] = dealerAmt;
+                            }
+                            Navigator.pop(context, payload);
+                          } else {
+                            // RON vs selected loser seat
+                            Navigator.pop(context, {
+                              'mode': 'ron',
+                              'base': base,
+                              'loser': selected, // seatPos
+                            });
+                          }
+                        },
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
 
     void _advanceRound() {
