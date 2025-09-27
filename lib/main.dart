@@ -42,7 +42,6 @@ class ScoreboardScreen extends StatefulWidget {
 }
 
 class _ScoreboardScreenState extends State<ScoreboardScreen> {
-
   final List<String> seatOrder = ['bottom', 'right', 'top', 'left'];
 
   Map<String, String> names = {
@@ -128,6 +127,12 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
           'top': false,
           'left': false,
         };
+        names = {
+          'bottom': 'プレイヤー1',
+          'right': 'プレイヤー2',
+          'top': 'プレイヤー3',
+          'left': 'プレイヤー4',
+        };
         seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
         currentRound = '東1局';
         honba = 0;
@@ -145,6 +150,12 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
         'right': false,
         'top': false,
         'left': false,
+      };
+      names = {
+        'bottom': 'プレイヤー1',
+        'right': 'プレイヤー2',
+        'top': 'プレイヤー3',
+        'left': 'プレイヤー4',
       };
       seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
       currentRound = '東1局';
@@ -289,6 +300,47 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
       (seat, status) => prefs.setBool('riichi_$seat', status),
     );
     prefs.setInt('riichiSticks', riichiSticks);
+  }
+
+  Future<void> _editPlayerName(String seatPos) async {
+    final controller = TextEditingController(text: names[seatPos] ?? '');
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('${seatWind[seatPos] ?? ''} の名前を変更'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'プレイヤー名',
+              hintText: '名前を入力',
+            ),
+            onSubmitted: (v) => Navigator.pop(context, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newName == null) return; // cancelled
+    if (newName.isEmpty) return; // ignore empty names
+
+    setState(() {
+      names[seatPos] = newName;
+    });
+    await _saveData(); // you already persist names seat-based
   }
 
   @override
@@ -848,18 +900,23 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // Player name
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                names[seatPos] ?? '',
-                                style: TextStyle(
-                                  fontFamily: 'NotoSansJP',
-                                  fontSize: scoreFont * 0.25,
-                                  // slightly smaller than score
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white70,
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              // ensure this area captures the tap
+                              onTap: () => _editPlayerName(seatPos),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  names[seatPos] ?? '',
+                                  style: TextStyle(
+                                    fontFamily: 'NotoSansJP',
+                                    fontSize: scoreFont * 0.25,
+                                    // slightly smaller than score
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white70,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ),
                             // Score
