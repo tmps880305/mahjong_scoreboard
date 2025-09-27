@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' show pi;
 
+import '../widgets/center_pad.dart';
 import '../widgets/player_card.dart';
 
 class MahjongScoreboardApp extends StatelessWidget {
@@ -438,62 +439,11 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       ), // 90 degrees clockwise
                     ),
                     // Center pad
-                    Center(
-                      child: Container(
-                        width: containerSize * 0.45,
-                        height: containerSize * 0.45,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final fontSize = constraints.maxWidth * 0.3;
-                                return Text(
-                                  currentRound,
-                                  style: TextStyle(
-                                    fontFamily: 'NotoSansJP',
-                                    fontSize: fontSize,
-                                    color: Colors.white,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                );
-                              },
-                            ),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final fontSize = constraints.maxWidth * 0.2;
-                                return Text(
-                                  '$honba 本場',
-                                  style: TextStyle(
-                                    fontFamily: 'NotoSansJP',
-                                    fontSize: fontSize * 0.5,
-                                    color: const Color(0xFFFFD700),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                );
-                              },
-                            ),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final fontSize = constraints.maxWidth * 0.2;
-                                return Text(
-                                  '托 $riichiSticks 本',
-                                  style: TextStyle(
-                                    fontFamily: 'NotoSansJP',
-                                    fontSize: fontSize * 0.5,
-                                    color: const Color(0xFFFFD700),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+                    CenterPad(
+                      currentRound: currentRound,
+                      honba: honba,
+                      riichiSticks: riichiSticks,
+                      containerSize: containerSize,
                     ),
                   ],
                 ),
@@ -578,7 +528,7 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          // color: Colors.black,
                         ),
                       ),
                     ),
@@ -590,7 +540,7 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                           fontFamily: 'NotoSansJP',
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black,
+                          // color: Colors.black,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -630,7 +580,7 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                             // Radios: other seats + ツモ
                             const Text(
                               '支払い元',
-                              style: TextStyle(color: Colors.black),
+                              // style: TextStyle(color: Colors.black),
                             ),
                             ...seatWind.entries
                                 .where(
