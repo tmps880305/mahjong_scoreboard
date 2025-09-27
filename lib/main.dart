@@ -42,75 +42,224 @@ class ScoreboardScreen extends StatefulWidget {
 }
 
 class _ScoreboardScreenState extends State<ScoreboardScreen> {
-  Map<String, int> scores = {'東': 25000, '南': 25000, '西': 25000, '北': 25000};
+  // Physical seats in clockwise order
+  final List<String> seatOrder = ['bottom', 'right', 'top', 'left'];
+
   Map<String, String> names = {
     '東': 'プレイヤー1',
     '南': 'プレイヤー2',
     '西': 'プレイヤー3',
     '北': 'プレイヤー4',
   };
-  Map<String, bool> riichiStatus = {
-    '東': false,
-    '南': false,
-    '西': false,
-    '北': false,
+
+  // Scores tied to physical seats
+  Map<String, int> scores = {
+    'bottom': 25000,
+    'right': 25000,
+    'top': 25000,
+    'left': 25000,
   };
+
+  // Riichi status tied to seats
+  Map<String, bool> riichiStatus = {
+    'bottom': false,
+    'right': false,
+    'top': false,
+    'left': false,
+  };
+
+  // Winds mapping to seats (rotates)
+  Map<String, String> seatWind = {
+    'bottom': '東',
+    'right': '南',
+    'top': '西',
+    'left': '北',
+  };
+
+  // Helpers to avoid nulls
+  bool isRiichiOn(String seatPos) => riichiStatus[seatPos] ?? false;
+
+  int seatScore(String seatPos) => scores[seatPos] ?? 0;
+
+  String windLabel(String seatPos) => seatWind[seatPos] ?? '東';
+
+  String currentRound = '東1局';
+  int honba = 0;
   int riichiSticks = 0;
-  String currentRound = '東2局';
-  int honba = 1;
+
+  String get dealerSeat {
+    try {
+      return seatWind.entries.firstWhere((e) => e.value == '東').key;
+    } catch (_) {
+      return 'bottom'; // fallback if mapping was broken
+    }
+  }
+
+  void _rotateWindsClockwise() {
+    final b = seatWind['bottom'] ?? '東';
+    final r = seatWind['right'] ?? '南';
+    final t = seatWind['top'] ?? '西';
+    final l = seatWind['left'] ?? '北';
+
+    // clockwise rotation of winds over seats
+    seatWind['bottom'] = l; // left → bottom
+    seatWind['right'] = b; // bottom → right
+    seatWind['top'] = r; // right → top
+    seatWind['left'] = t; // top → left
+  }
 
   @override
   void initState() {
     super.initState();
     // Lock orientation to portrait
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    _loadData();
+    _loadData().then((_) => _ensureFirstBootInitialized());
+  }
+
+  Future<void> _ensureFirstBootInitialized() async {
+    final prefs = await SharedPreferences.getInstance();
+    final initialized = prefs.getBool('initialized') ?? false;
+    if (!initialized) {
+      setState(() {
+        scores = {'bottom': 25000, 'right': 25000, 'top': 25000, 'left': 25000};
+        riichiStatus = {
+          'bottom': false,
+          'right': false,
+          'top': false,
+          'left': false,
+        };
+        seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
+        currentRound = '東1局';
+        honba = 0;
+        riichiSticks = 0;
+      });
+      await _saveData();
+    }
+  }
+
+  Future<void> _resetGame() async {
+    setState(() {
+      scores = {'bottom': 25000, 'right': 25000, 'top': 25000, 'left': 25000};
+      riichiStatus = {
+        'bottom': false,
+        'right': false,
+        'top': false,
+        'left': false,
+      };
+      seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
+      currentRound = '東1局';
+      honba = 0;
+      riichiSticks = 0;
+    });
+    await _saveData();
   }
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Try seat-based keys first
+    final hasSeatBased =
+        prefs.containsKey('score_bottom') ||
+        prefs.containsKey('score_right') ||
+        prefs.containsKey('score_top') ||
+        prefs.containsKey('score_left');
+
     setState(() {
-      scores = {
-        '東': prefs.getInt('score_東') ?? 25000,
-        '南': prefs.getInt('score_南') ?? 25000,
-        '西': prefs.getInt('score_西') ?? 25000,
-        '北': prefs.getInt('score_北') ?? 25000,
-      };
-      names = {
-        '東': prefs.getString('name_東') ?? 'プレイヤー1',
-        '南': prefs.getString('name_南') ?? 'プレイヤー2',
-        '西': prefs.getString('name_西') ?? 'プレイヤー3',
-        '北': prefs.getString('name_北') ?? 'プレイヤー4',
-      };
-      riichiStatus = {
-        '東': prefs.getBool('riichi_東') ?? false,
-        '南': prefs.getBool('riichi_南') ?? false,
-        '西': prefs.getBool('riichi_西') ?? false,
-        '北': prefs.getBool('riichi_北') ?? false,
-      };
+      if (hasSeatBased) {
+        // Seat-based load
+        scores = {
+          'bottom': prefs.getInt('score_bottom') ?? 25000,
+          'right': prefs.getInt('score_right') ?? 25000,
+          'top': prefs.getInt('score_top') ?? 25000,
+          'left': prefs.getInt('score_left') ?? 25000,
+        };
+        riichiStatus = {
+          'bottom': prefs.getBool('riichi_bottom') ?? false,
+          'right': prefs.getBool('riichi_right') ?? false,
+          'top': prefs.getBool('riichi_top') ?? false,
+          'left': prefs.getBool('riichi_left') ?? false,
+        };
+
+        // Winds (fallback to default if not saved)
+        seatWind = {
+          'bottom': prefs.getString('wind_bottom') ?? '東',
+          'right': prefs.getString('wind_right') ?? '南',
+          'top': prefs.getString('wind_top') ?? '西',
+          'left': prefs.getString('wind_left') ?? '北',
+        };
+      } else {
+        // MIGRATION: From old wind-based keys to seat-based
+        // Assume default starting assignment bottom=東, right=南, top=西, left=北
+        scores = {
+          'bottom': prefs.getInt('score_東') ?? 25000,
+          'right': prefs.getInt('score_南') ?? 25000,
+          'top': prefs.getInt('score_西') ?? 25000,
+          'left': prefs.getInt('score_北') ?? 25000,
+        };
+        riichiStatus = {
+          'bottom': prefs.getBool('riichi_東') ?? false,
+          'right': prefs.getBool('riichi_南') ?? false,
+          'top': prefs.getBool('riichi_西') ?? false,
+          'left': prefs.getBool('riichi_北') ?? false,
+        };
+        seatWind = {'bottom': '東', 'right': '南', 'top': '西', 'left': '北'};
+      }
+
+      // Round info
+      currentRound = prefs.getString('currentRound') ?? '東1局';
+      honba = prefs.getInt('honba') ?? 0;
       riichiSticks = prefs.getInt('riichiSticks') ?? 0;
     });
   }
 
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setInt('score_bottom', scores['bottom'] ?? 25000);
+    await prefs.setInt('score_right', scores['right'] ?? 25000);
+    await prefs.setInt('score_top', scores['top'] ?? 25000);
+    await prefs.setInt('score_left', scores['left'] ?? 25000);
+
+    await prefs.setBool('riichi_bottom', riichiStatus['bottom'] ?? false);
+    await prefs.setBool('riichi_right', riichiStatus['right'] ?? false);
+    await prefs.setBool('riichi_top', riichiStatus['top'] ?? false);
+    await prefs.setBool('riichi_left', riichiStatus['left'] ?? false);
+
+    await prefs.setString('wind_bottom', seatWind['bottom'] ?? '東');
+    await prefs.setString('wind_right', seatWind['right'] ?? '南');
+    await prefs.setString('wind_top', seatWind['top'] ?? '西');
+    await prefs.setString('wind_left', seatWind['left'] ?? '北');
+
+    await prefs.setString('currentRound', currentRound);
+    await prefs.setInt('honba', honba);
+    await prefs.setInt('riichiSticks', riichiSticks);
+  }
+
+  Future<void> _toggleRiichi(String seat) async {
+    final wasOn = riichiStatus[seat] ?? false;
+    final current = scores[seat] ?? 0;
+
+    setState(() {
+      if (!wasOn) {
+        // Turn ON → pay 1000
+        scores[seat] = current - 1000;
+        riichiStatus[seat] = true;
+        riichiSticks += 1;
+      } else {
+        // Turn OFF → refund 1000
+        scores[seat] = current + 1000;
+        riichiStatus[seat] = false;
+        if (riichiSticks > 0) riichiSticks -= 1;
+      }
+    });
+
+    // Save back to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
     scores.forEach((seat, score) => prefs.setInt('score_$seat', score));
-    names.forEach((seat, name) => prefs.setString('name_$seat', name));
     riichiStatus.forEach(
       (seat, status) => prefs.setBool('riichi_$seat', status),
     );
     prefs.setInt('riichiSticks', riichiSticks);
-  }
-
-  void _declareRiichi(String seat) {
-    if (!riichiStatus[seat]!) {
-      setState(() {
-        scores[seat] = scores[seat]! - 1000;
-        riichiStatus[seat] = true;
-        riichiSticks += 1;
-      });
-      _saveData();
-    }
   }
 
   @override
@@ -137,7 +286,11 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       left: 0,
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard('東', true, 0), // No rotation
+                      child: _buildPlayerCard(
+                        'bottom',
+                        seatWind['bottom'] == '東', // dealer if wind is 東
+                        0,
+                      ), // No rotation
                     ),
                     // Player 2 (南) - Right side, accounting for rotation
                     Positioned(
@@ -147,8 +300,8 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       width: baseCardWidth,
                       height: baseCardHeight,
                       child: _buildPlayerCard(
-                        '南',
-                        false,
+                        'right',
+                        seatWind['right'] == '東',
                         -pi / 2,
                       ), // 90 degrees counter-clockwise
                     ),
@@ -158,7 +311,11 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       right: 0,
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard('西', false, pi), // 180 degrees
+                      child: _buildPlayerCard(
+                        'top',
+                        seatWind['top'] == '東',
+                        pi,
+                      ), // 180 degrees
                     ),
                     // Player 4 (北) - Left side, accounting for rotation
                     Positioned(
@@ -168,8 +325,8 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       width: baseCardWidth,
                       height: baseCardHeight,
                       child: _buildPlayerCard(
-                        '北',
-                        false,
+                        'left',
+                        seatWind['left'] == '東',
                         pi / 2,
                       ), // 90 degrees clockwise
                     ),
@@ -250,131 +407,242 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
     );
   }
 
-  Widget _buildPlayerCard(String seat, bool isDealer, double contentRotation) {
+  Widget _buildPlayerCard(
+    String seatPos,
+    bool isDealer,
+    double contentRotation,
+  ) {
+    Future<void> _enterScoringMode(String seat) async {
+      bool _isDealer(String seat) {
+        // Dealer is always '東' player in your layout
+        return seat == '東';
+      }
+
+      String _nextWind(String wind) {
+        switch (wind) {
+          case '東':
+            return '南';
+          case '南':
+            return '西';
+          case '西':
+            return '北';
+          default:
+            return '東';
+        }
+      }
+
+      final controller = TextEditingController();
+
+      final result = await showDialog<int>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('得点入力 - $seat'),
+            content: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(hintText: '点数を入力してください'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: () {
+                  final value = int.tryParse(controller.text);
+                  Navigator.pop(context, value);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+
+      void _advanceRound() {
+        final m = RegExp(r'([東南西北])(\d)局').firstMatch(currentRound);
+        String wind = m?.group(1) ?? '東';
+        int num = int.tryParse(m?.group(2) ?? '1') ?? 1;
+
+        if (num < 4) {
+          num += 1;
+        } else {
+          wind = _nextWind(wind);
+          num = 1;
+        }
+        currentRound = '$wind${num}局';
+      }
+
+      void _processScoring(String winnerSeatPos, int winPoints) {
+        final dealer = dealerSeat;
+        final dealerWon = (winnerSeatPos == dealer);
+
+        setState(() {
+          final riichiBonus = riichiSticks * 1000;
+          final old = scores[winnerSeatPos] ?? 0;
+          scores[winnerSeatPos] = old + winPoints + riichiBonus;
+
+          // winner takes all riichi sticks; then clear table sticks & statuses
+          riichiSticks = 0;
+          riichiStatus.updateAll((_, __) => false);
+
+          if (dealerWon) {
+            // Dealer win → same 局; 本場 +1
+            honba += 1;
+            // currentRound stays (e.g., 東1局 remains)
+          } else {
+            // Non-dealer win → 局 +1; dealer passes clockwise; 本場 reset
+            honba = 0;
+            _advanceRound();
+            _rotateWindsClockwise();
+          }
+        });
+
+        _saveData(); // persist to SharedPreferences
+      }
+
+      if (result != null) {
+        _processScoring(seat, result);
+      }
+    }
+
     return Transform.rotate(
       angle: contentRotation,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: isDealer
-              ? const LinearGradient(
-                  colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isDealer ? null : const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: isDealer
-              ? Border.all(color: const Color(0xFFFFD700), width: 2)
-              : null,
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Use real constraints, not screen width, to size inner content
-            final cardW = constraints.maxWidth;
-            final cardH = constraints.maxHeight;
+      child: GestureDetector(
+        onTap: () => _enterScoringMode(seatPos),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: isDealer
+                ? const LinearGradient(
+                    colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isDealer ? null : const Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: isDealer
+                ? Border.all(color: const Color(0xFFFFD700), width: 2)
+                : null,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Use real constraints, not screen width, to size inner content
+              final cardW = constraints.maxWidth;
+              final cardH = constraints.maxHeight;
 
-            // Your padding is 2% of card width on all sides
-            final pad = cardW * 0.02;
-            final innerH = (cardH - pad * 2).clamp(0.0, double.infinity);
-            final innerW = (cardW - pad * 2).clamp(0.0, double.infinity);
+              // Your padding is 2% of card width on all sides
+              final pad = cardW * 0.02;
+              final innerH = (cardH - pad * 2).clamp(0.0, double.infinity);
+              final innerW = (cardW - pad * 2).clamp(0.0, double.infinity);
 
-            // Keep your visual scales based on height like before
-            final seatFont = cardH * 0.7;
-            final scoreFont = cardH * 0.5;
-            final barW = innerW * 0.6;
-            final barH = barW / 20;
+              // Keep your visual scales based on height like before
+              final seatFont = cardH * 0.7;
+              final scoreFont = cardH * 0.5;
+              final barW = innerW * 0.6;
+              final barH = barW / 20;
 
-            return Padding(
-              padding: EdgeInsets.all(pad),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Seat label
-                  Container(
-                    width: seatFont * 1.4,
-                    height: seatFont * 1.4,
-                    // decoration: BoxDecoration(
-                    //   border: Border.all(color: Colors.red, width: 2),
-                    // ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      seat,
-                      style: TextStyle(
-                        fontFamily: 'NotoSansJP',
-                        fontSize: seatFont,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.0,
+              final windLabel = seatWind[seatPos] ?? '東';
+
+              return Padding(
+                padding: EdgeInsets.all(pad),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Seat label
+                    Container(
+                      width: seatFont * 1.4,
+                      height: seatFont * 1.4,
+                      // decoration: BoxDecoration(
+                      //   border: Border.all(color: Colors.red, width: 2),
+                      // ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        windLabel,
+                        style: TextStyle(
+                          fontFamily: 'NotoSansJP',
+                          fontSize: seatFont,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.0,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: cardW * 0.05),
-                  // Right side content
-                  Expanded(
-                    child: SizedBox(
-                      height: innerH,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Score
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              '${scores[seat]}',
-                              style: TextStyle(
-                                fontFamily: 'NotoSansJP',
-                                fontSize: scoreFont,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                    SizedBox(width: cardW * 0.05),
+                    // Right side content
+                    Expanded(
+                      child: SizedBox(
+                        height: innerH,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Score
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${scores[seatPos] ?? 0}',
+                                style: TextStyle(
+                                  fontFamily: 'NotoSansJP',
+                                  fontSize: scoreFont,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                          ),
-                          // Riichi bar
-                          GestureDetector(
-                            onTap: () => _declareRiichi(seat),
-                            child: Container(
-                              width: barW,
-                              height: barH,
-                              decoration: BoxDecoration(
-                                color: riichiStatus[seat]!
-                                    ? const Color(0xFFFFCA28)
-                                    : const Color(0xFFFFFFFF),
-                                borderRadius: BorderRadius.circular(4),
-                                border: riichiStatus[seat]!
-                                    ? Border.all(color: Colors.white, width: 2)
-                                    : null,
-                              ),
-                              child: Center(
+                            // Riichi bar
+                            GestureDetector(
+                              onTap: () => _toggleRiichi(seatPos),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: (riichiStatus[seatPos] ?? false)
+                                    ? 1.0
+                                    : 0.3,
                                 child: Container(
-                                  width: barH * 0.7,
-                                  height: barH * 0.7,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFFFF0000),
+                                  width: barW,
+                                  height: barH,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFFFF),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: (riichiStatus[seatPos] ?? false)
+                                        ? Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          )
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      width: barH * 0.7,
+                                      height: barH * 0.7,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Color(0xFFFF0000),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
