@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' show pi;
 
+import '../widgets/player_card.dart';
+
 class MahjongScoreboardApp extends StatelessWidget {
   const MahjongScoreboardApp({super.key});
 
@@ -363,10 +365,17 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       left: 0,
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard(
-                        'bottom',
-                        seatWind['bottom'] == '東', // dealer if wind is 東
-                        0,
+                      child: PlayerCard(
+                        seatPos: 'bottom',
+                        isDealer: seatWind['bottom'] == '東',
+                        contentRotation: 0,
+                        scores: scores,
+                        names: names,
+                        riichiStatus: riichiStatus,
+                        seatWind: seatWind,
+                        onTapCard: _enterScoringMode,
+                        onTapName: _editPlayerName,
+                        onToggleRiichi: _toggleRiichi,
                       ), // No rotation
                     ),
                     // Player 2 (南) - Right side, accounting for rotation
@@ -376,10 +385,17 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       // Adjust for rotation: move up by card width
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard(
-                        'right',
-                        seatWind['right'] == '東',
-                        -pi / 2,
+                      child: PlayerCard(
+                        seatPos: 'right',
+                        isDealer: seatWind['right'] == '東',
+                        contentRotation: -pi / 2,
+                        scores: scores,
+                        names: names,
+                        riichiStatus: riichiStatus,
+                        seatWind: seatWind,
+                        onTapCard: _enterScoringMode,
+                        onTapName: _editPlayerName,
+                        onToggleRiichi: _toggleRiichi,
                       ), // 90 degrees counter-clockwise
                     ),
                     // Player 3 (西) - Top
@@ -388,10 +404,17 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       right: 0,
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard(
-                        'top',
-                        seatWind['top'] == '東',
-                        pi,
+                      child: PlayerCard(
+                        seatPos: 'top',
+                        isDealer: seatWind['top'] == '東',
+                        contentRotation: pi,
+                        scores: scores,
+                        names: names,
+                        riichiStatus: riichiStatus,
+                        seatWind: seatWind,
+                        onTapCard: _enterScoringMode,
+                        onTapName: _editPlayerName,
+                        onToggleRiichi: _toggleRiichi,
                       ), // 180 degrees
                     ),
                     // Player 4 (北) - Left side, accounting for rotation
@@ -401,10 +424,17 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                       // Adjust for rotation: move down by card width
                       width: baseCardWidth,
                       height: baseCardHeight,
-                      child: _buildPlayerCard(
-                        'left',
-                        seatWind['left'] == '東',
-                        pi / 2,
+                      child: PlayerCard(
+                        seatPos: 'left',
+                        isDealer: seatWind['left'] == '東',
+                        contentRotation: pi / 2,
+                        scores: scores,
+                        names: names,
+                        riichiStatus: riichiStatus,
+                        seatWind: seatWind,
+                        onTapCard: _enterScoringMode,
+                        onTapName: _editPlayerName,
+                        onToggleRiichi: _toggleRiichi,
                       ), // 90 degrees clockwise
                     ),
                     // Center pad
@@ -494,486 +524,803 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
     );
   }
 
-  Widget _buildPlayerCard(
-    String seatPos,
-    bool isDealer,
-    double contentRotation,
-  ) {
-    Future<void> _enterScoringMode(String winnerSeat) async {
-      String _nextWind(String wind) {
-        switch (wind) {
-          case '東':
-            return '南';
-          case '南':
-            return '西';
-          case '西':
-            return '北';
-          default:
-            return '東';
-        }
-      }
-
-      final pointsCtrl = TextEditingController();
-      final tsumoDealerCtrl =
-          TextEditingController(); // shown only when winner NOT dealer
-      String? selected; // radio selection
-      final isWinnerDealer = (seatWind[winnerSeat] == '東');
-
-      // final controller = TextEditingController();
-
-      // final winnerWind = seatWind[winnerSeat];
-
-      final winnerName = names[winnerSeat] ?? seatWind[winnerSeat] ?? '';
-
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, setState) {
-              return Dialog(
-                // margins from the screen edge so the inner box becomes ~40% × 70%
-                insetPadding: EdgeInsets.symmetric(
-                  horizontal:
-                      MediaQuery.of(context).size.width *
-                      0.20, // 30% + 30% = 60% margins → 40% width
-                  vertical:
-                      MediaQuery.of(context).size.height *
-                      0.10, // 15% + 15% = 30% margins → 70% height
-                ),
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.60,
-                  height: MediaQuery.of(context).size.height * 0.80,
-                  child: Column(
-                    children: [
-                      // Title (we’ll switch to player name in section B)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text(
-                          '得点入力', // we’ll append “<player name> 勝ち” below
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          winnerName,
-                          style: TextStyle(
-                            fontFamily: 'NotoSansJP',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                      // Scrollable content
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Base points (always visible)
-                              TextField(
-                                controller: pointsCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: '点数（基本）',
-                                  hintText: 'ロン / 親ツモ',
-                                ),
-                              ),
-
-                              // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
-                              if (selected == 'tsumo' && !isWinnerDealer) ...[
-                                const SizedBox(height: 12),
-                                TextField(
-                                  controller: tsumoDealerCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    labelText: '点数',
-                                    hintText: '親が支払う点数',
-                                  ),
-                                ),
-                              ],
-
-                              const SizedBox(height: 48),
-                              // Radios: other seats + ツモ
-                              const Text(
-                                '支払い元',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                              ...seatWind.entries
-                                  .where(
-                                    (e) => e.key != winnerSeat,
-                                  ) // exclude winner
-                                  .map(
-                                    (e) => RadioListTile<String>(
-                                      title: Text(e.value), // wind (東南西北)
-                                      value: e.key, // seatPos
-                                      groupValue: selected,
-                                      onChanged: (v) =>
-                                          setState(() => selected = v),
-                                    ),
-                                  ),
-                              RadioListTile<String>(
-                                title: const Text('ツモ'),
-                                value: 'tsumo',
-                                groupValue: selected,
-                                onChanged: (v) => setState(() => selected = v),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Buttons pinned at bottom
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('キャンセル'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                final base = int.tryParse(pointsCtrl.text);
-                                if (selected == null || base == null) return;
-
-                                if (selected == 'tsumo') {
-                                  // ツモ
-                                  final payload = <String, dynamic>{
-                                    'mode': 'tsumo',
-                                    'base': base,
-                                  };
-                                  if (!isWinnerDealer) {
-                                    // needs dealer amount
-                                    final dealerAmt = int.tryParse(
-                                      tsumoDealerCtrl.text ?? '',
-                                    );
-                                    if (dealerAmt == null)
-                                      return; // invalid; do nothing
-                                    payload['dealer'] = dealerAmt;
-                                  }
-                                  Navigator.pop(context, payload);
-                                } else {
-                                  // RON vs selected loser seat
-                                  Navigator.pop(context, {
-                                    'mode': 'ron',
-                                    'base': base,
-                                    'loser': selected, // seatPos
-                                  });
-                                }
-                              },
-                              child: const Text('OK'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
-
-      void _advanceRound() {
-        final m = RegExp(r'([東南西北])(\d)局').firstMatch(currentRound);
-        String wind = m?.group(1) ?? '東';
-        int num = int.tryParse(m?.group(2) ?? '1') ?? 1;
-
-        if (num < 4) {
-          num += 1;
-        } else {
-          wind = _nextWind(wind);
-          num = 1;
-        }
-        currentRound = '$wind${num}局';
-      }
-
-      void _processScoringRon({
-        required String winnerSeat, // 'bottom'|'right'|'top'|'left'
-        required int points,
-        required String loserSeat, // seatPos
-      }) {
-        final dealer = dealerSeat;
-        final dealerWon = (winnerSeat == dealer);
-
-        setState(() {
-          // Winner gets points + all riichi sticks
-          final bonus = riichiSticks * 1000;
-          scores[winnerSeat] = (scores[winnerSeat] ?? 0) + points + bonus;
-
-          // Loser pays points
-          scores[loserSeat] = (scores[loserSeat] ?? 0) - points;
-
-          // Reset riichi
-          riichiSticks = 0;
-          riichiStatus.updateAll((k, v) => false);
-
-          // Round/dealer rules
-          if (dealerWon) {
-            honba += 1; // same 局, dealer stays
-          } else {
-            honba = 0;
-            _advanceRound();
-            _rotateWindsClockwise(); // dealer passes clockwise
-          }
-        });
-
-        _saveData();
-      }
-
-      void _processScoringTsumo({
-        required String winnerSeat,
-        required int baseForNonDealerOrAll,
-        int? dealerAmountIfNonDealerWins, // null when winner is dealer
-      }) {
-        final dealer = dealerSeat;
-        final winnerIsDealer = (winnerSeat == dealer);
-
-        // Build payer sets
-        final others = [
-          'bottom',
-          'right',
-          'top',
-          'left',
-        ].where((s) => s != winnerSeat).toList();
-
-        setState(() {
-          int totalTaken = 0;
-
-          if (winnerIsDealer) {
-            // All three others pay the same "base"
-            for (final seat in others) {
-              scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
-              totalTaken += baseForNonDealerOrAll;
-            }
-          } else {
-            // Winner is NOT dealer:
-            // Two non-dealers (excluding dealer and winner) pay "base"
-            final nonDealerLosers = others.where((s) => s != dealer).toList();
-            for (final seat in nonDealerLosers) {
-              scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
-              totalTaken += baseForNonDealerOrAll;
-            }
-            // Dealer pays "dealerAmount"
-            final dealerPay = dealerAmountIfNonDealerWins ?? 0;
-            scores[dealer] = (scores[dealer] ?? 0) - dealerPay;
-            totalTaken += dealerPay;
-          }
-
-          // Winner collects everything + riichi bonus
-          final bonus = riichiSticks * 1000;
-          scores[winnerSeat] = (scores[winnerSeat] ?? 0) + totalTaken + bonus;
-
-          // Reset riichi
-          riichiSticks = 0;
-          riichiStatus.updateAll((k, v) => false);
-
-          // Round/dealer rules:
-          if (winnerIsDealer) {
-            honba += 1; // dealer win → same 局
-          } else {
-            honba = 0;
-            _advanceRound();
-            _rotateWindsClockwise();
-          }
-        });
-
-        _saveData();
-      }
-
-      if (result == null) return;
-
-      // Route to handler
-      final mode = result['mode'] as String;
-      if (mode == 'ron') {
-        _processScoringRon(
-          winnerSeat: winnerSeat,
-          points: result['base'] as int,
-          loserSeat: result['loser'] as String,
-        );
-      } else {
-        // tsumo
-        final base = result['base'] as int;
-        final dealerAmt = result.containsKey('dealer')
-            ? result['dealer'] as int
-            : null;
-        _processScoringTsumo(
-          winnerSeat: winnerSeat,
-          baseForNonDealerOrAll: base,
-          dealerAmountIfNonDealerWins: dealerAmt, // null when winner is dealer
-        );
+  Future<void> _enterScoringMode(String winnerSeat) async {
+    String _nextWind(String wind) {
+      switch (wind) {
+        case '東':
+          return '南';
+        case '南':
+          return '西';
+        case '西':
+          return '北';
+        default:
+          return '東';
       }
     }
 
-    return Transform.rotate(
-      angle: contentRotation,
-      child: GestureDetector(
-        onTap: () => _enterScoringMode(seatPos),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: isDealer
-                ? const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: isDealer ? null : const Color(0xFF2A2A2A),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+    final pointsCtrl = TextEditingController();
+    final tsumoDealerCtrl =
+        TextEditingController(); // shown only when winner NOT dealer
+    String? selected; // radio selection
+    final isWinnerDealer = (seatWind[winnerSeat] == '東');
+
+    // final controller = TextEditingController();
+
+    // final winnerWind = seatWind[winnerSeat];
+
+    final winnerName = names[winnerSeat] ?? seatWind[winnerSeat] ?? '';
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              // margins from the screen edge so the inner box becomes ~40% × 70%
+              insetPadding: EdgeInsets.symmetric(
+                horizontal:
+                    MediaQuery.of(context).size.width *
+                    0.20, // 30% + 30% = 60% margins → 40% width
+                vertical:
+                    MediaQuery.of(context).size.height *
+                    0.10, // 15% + 15% = 30% margins → 70% height
               ),
-            ],
-            border: isDealer
-                ? Border.all(color: const Color(0xFFFFD700), width: 2)
-                : null,
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Use real constraints, not screen width, to size inner content
-              final cardW = constraints.maxWidth;
-              final cardH = constraints.maxHeight;
-
-              // Your padding is 2% of card width on all sides
-              final pad = cardW * 0.02;
-              final innerH = (cardH - pad * 2).clamp(0.0, double.infinity);
-              final innerW = (cardW - pad * 2).clamp(0.0, double.infinity);
-
-              // Keep your visual scales based on height like before
-              final seatFont = cardH * 0.7;
-              final scoreFont = cardH * 0.4;
-              final barW = innerW * 0.6;
-              final barH = barW / 20;
-
-              final windLabel = seatWind[seatPos] ?? '東';
-
-              return Padding(
-                padding: EdgeInsets.all(pad),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.60,
+                height: MediaQuery.of(context).size.height * 0.80,
+                child: Column(
                   children: [
-                    // Seat label
-                    Container(
-                      width: seatFont * 1.4,
-                      height: seatFont * 1.4,
-                      // decoration: BoxDecoration(
-                      //   border: Border.all(color: Colors.red, width: 2),
-                      // ),
-                      alignment: Alignment.center,
+                    // Title (we’ll switch to player name in section B)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                       child: Text(
-                        windLabel,
-                        style: TextStyle(
-                          fontFamily: 'NotoSansJP',
-                          fontSize: seatFont,
+                        '得点入力', // we’ll append “<player name> 勝ち” below
+                        style: const TextStyle(
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.0,
+                          color: Colors.black,
                         ),
                       ),
                     ),
-                    SizedBox(width: cardW * 0.05),
-                    // Right side content
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        winnerName,
+                        style: TextStyle(
+                          fontFamily: 'NotoSansJP',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+                    // Scrollable content
                     Expanded(
-                      child: SizedBox(
-                        height: innerH,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Player name
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              // ensure this area captures the tap
-                              onTap: () => _editPlayerName(seatPos),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  names[seatPos] ?? '',
-                                  style: TextStyle(
-                                    fontFamily: 'NotoSansJP',
-                                    fontSize: scoreFont * 0.25,
-                                    // slightly smaller than score
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white70,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
+                            // Base points (always visible)
+                            TextField(
+                              controller: pointsCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: '点数（基本）',
+                                hintText: 'ロン / 親ツモ',
                               ),
                             ),
-                            // Score
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                '${scores[seatPos] ?? 0}',
-                                style: TextStyle(
-                                  fontFamily: 'NotoSansJP',
-                                  fontSize: scoreFont,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+
+                            // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
+                            if (selected == 'tsumo' && !isWinnerDealer) ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: tsumoDealerCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '点数',
+                                  hintText: '親が支払う点数',
                                 ),
-                                textAlign: TextAlign.center,
                               ),
+                            ],
+
+                            const SizedBox(height: 48),
+                            // Radios: other seats + ツモ
+                            const Text(
+                              '支払い元',
+                              style: TextStyle(color: Colors.black),
                             ),
-                            // Riichi bar
-                            GestureDetector(
-                              onTap: () => _toggleRiichi(seatPos),
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 150),
-                                opacity: (riichiStatus[seatPos] ?? false)
-                                    ? 1.0
-                                    : 0.3,
-                                child: Container(
-                                  width: barW,
-                                  height: barH,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFFFFF),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: (riichiStatus[seatPos] ?? false)
-                                        ? Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          )
-                                        : null,
-                                  ),
-                                  child: Center(
-                                    child: Container(
-                                      width: barH * 0.7,
-                                      height: barH * 0.7,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Color(0xFFFF0000),
-                                      ),
-                                    ),
+                            ...seatWind.entries
+                                .where(
+                                  (e) => e.key != winnerSeat,
+                                ) // exclude winner
+                                .map(
+                                  (e) => RadioListTile<String>(
+                                    title: Text(e.value), // wind (東南西北)
+                                    value: e.key, // seatPos
+                                    groupValue: selected,
+                                    onChanged: (v) =>
+                                        setState(() => selected = v),
                                   ),
                                 ),
-                              ),
+                            RadioListTile<String>(
+                              title: const Text('ツモ'),
+                              value: 'tsumo',
+                              groupValue: selected,
+                              onChanged: (v) => setState(() => selected = v),
                             ),
                           ],
                         ),
+                      ),
+                    ),
+
+                    // Buttons pinned at bottom
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('キャンセル'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              final base = int.tryParse(pointsCtrl.text);
+                              if (selected == null || base == null) return;
+
+                              if (selected == 'tsumo') {
+                                // ツモ
+                                final payload = <String, dynamic>{
+                                  'mode': 'tsumo',
+                                  'base': base,
+                                };
+                                if (!isWinnerDealer) {
+                                  // needs dealer amount
+                                  final dealerAmt = int.tryParse(
+                                    tsumoDealerCtrl.text ?? '',
+                                  );
+                                  if (dealerAmt == null)
+                                    return; // invalid; do nothing
+                                  payload['dealer'] = dealerAmt;
+                                }
+                                Navigator.pop(context, payload);
+                              } else {
+                                // RON vs selected loser seat
+                                Navigator.pop(context, {
+                                  'mode': 'ron',
+                                  'base': base,
+                                  'loser': selected, // seatPos
+                                });
+                              }
+                            },
+                            child: const Text('OK'),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ),
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
+
+    void _advanceRound() {
+      final m = RegExp(r'([東南西北])(\d)局').firstMatch(currentRound);
+      String wind = m?.group(1) ?? '東';
+      int num = int.tryParse(m?.group(2) ?? '1') ?? 1;
+
+      if (num < 4) {
+        num += 1;
+      } else {
+        wind = _nextWind(wind);
+        num = 1;
+      }
+      currentRound = '$wind${num}局';
+    }
+
+    void _processScoringRon({
+      required String winnerSeat, // 'bottom'|'right'|'top'|'left'
+      required int points,
+      required String loserSeat, // seatPos
+    }) {
+      final dealer = dealerSeat;
+      final dealerWon = (winnerSeat == dealer);
+
+      setState(() {
+        // Winner gets points + all riichi sticks
+        final bonus = riichiSticks * 1000;
+        scores[winnerSeat] = (scores[winnerSeat] ?? 0) + points + bonus;
+
+        // Loser pays points
+        scores[loserSeat] = (scores[loserSeat] ?? 0) - points;
+
+        // Reset riichi
+        riichiSticks = 0;
+        riichiStatus.updateAll((k, v) => false);
+
+        // Round/dealer rules
+        if (dealerWon) {
+          honba += 1; // same 局, dealer stays
+        } else {
+          honba = 0;
+          _advanceRound();
+          _rotateWindsClockwise(); // dealer passes clockwise
+        }
+      });
+
+      _saveData();
+    }
+
+    void _processScoringTsumo({
+      required String winnerSeat,
+      required int baseForNonDealerOrAll,
+      int? dealerAmountIfNonDealerWins, // null when winner is dealer
+    }) {
+      final dealer = dealerSeat;
+      final winnerIsDealer = (winnerSeat == dealer);
+
+      // Build payer sets
+      final others = [
+        'bottom',
+        'right',
+        'top',
+        'left',
+      ].where((s) => s != winnerSeat).toList();
+
+      setState(() {
+        int totalTaken = 0;
+
+        if (winnerIsDealer) {
+          // All three others pay the same "base"
+          for (final seat in others) {
+            scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+            totalTaken += baseForNonDealerOrAll;
+          }
+        } else {
+          // Winner is NOT dealer:
+          // Two non-dealers (excluding dealer and winner) pay "base"
+          final nonDealerLosers = others.where((s) => s != dealer).toList();
+          for (final seat in nonDealerLosers) {
+            scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+            totalTaken += baseForNonDealerOrAll;
+          }
+          // Dealer pays "dealerAmount"
+          final dealerPay = dealerAmountIfNonDealerWins ?? 0;
+          scores[dealer] = (scores[dealer] ?? 0) - dealerPay;
+          totalTaken += dealerPay;
+        }
+
+        // Winner collects everything + riichi bonus
+        final bonus = riichiSticks * 1000;
+        scores[winnerSeat] = (scores[winnerSeat] ?? 0) + totalTaken + bonus;
+
+        // Reset riichi
+        riichiSticks = 0;
+        riichiStatus.updateAll((k, v) => false);
+
+        // Round/dealer rules:
+        if (winnerIsDealer) {
+          honba += 1; // dealer win → same 局
+        } else {
+          honba = 0;
+          _advanceRound();
+          _rotateWindsClockwise();
+        }
+      });
+
+      _saveData();
+    }
+
+    if (result == null) return;
+
+    // Route to handler
+    final mode = result['mode'] as String;
+    if (mode == 'ron') {
+      _processScoringRon(
+        winnerSeat: winnerSeat,
+        points: result['base'] as int,
+        loserSeat: result['loser'] as String,
+      );
+    } else {
+      // tsumo
+      final base = result['base'] as int;
+      final dealerAmt = result.containsKey('dealer')
+          ? result['dealer'] as int
+          : null;
+      _processScoringTsumo(
+        winnerSeat: winnerSeat,
+        baseForNonDealerOrAll: base,
+        dealerAmountIfNonDealerWins: dealerAmt, // null when winner is dealer
+      );
+    }
   }
+
+  // Widget _buildPlayerCard(
+  //   String seatPos,
+  //   bool isDealer,
+  //   double contentRotation,
+  // ) {
+  //   Future<void> _enterScoringMode(String winnerSeat) async {
+  //     String _nextWind(String wind) {
+  //       switch (wind) {
+  //         case '東':
+  //           return '南';
+  //         case '南':
+  //           return '西';
+  //         case '西':
+  //           return '北';
+  //         default:
+  //           return '東';
+  //       }
+  //     }
+  //
+  //     final pointsCtrl = TextEditingController();
+  //     final tsumoDealerCtrl =
+  //         TextEditingController(); // shown only when winner NOT dealer
+  //     String? selected; // radio selection
+  //     final isWinnerDealer = (seatWind[winnerSeat] == '東');
+  //
+  //     // final controller = TextEditingController();
+  //
+  //     // final winnerWind = seatWind[winnerSeat];
+  //
+  //     final winnerName = names[winnerSeat] ?? seatWind[winnerSeat] ?? '';
+  //
+  //     final result = await showDialog<Map<String, dynamic>>(
+  //       context: context,
+  //       builder: (context) {
+  //         return StatefulBuilder(
+  //           builder: (context, setState) {
+  //             return Dialog(
+  //               // margins from the screen edge so the inner box becomes ~40% × 70%
+  //               insetPadding: EdgeInsets.symmetric(
+  //                 horizontal:
+  //                     MediaQuery.of(context).size.width *
+  //                     0.20, // 30% + 30% = 60% margins → 40% width
+  //                 vertical:
+  //                     MediaQuery.of(context).size.height *
+  //                     0.10, // 15% + 15% = 30% margins → 70% height
+  //               ),
+  //               child: SizedBox(
+  //                 width: MediaQuery.of(context).size.width * 0.60,
+  //                 height: MediaQuery.of(context).size.height * 0.80,
+  //                 child: Column(
+  //                   children: [
+  //                     // Title (we’ll switch to player name in section B)
+  //                     Padding(
+  //                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+  //                       child: Text(
+  //                         '得点入力', // we’ll append “<player name> 勝ち” below
+  //                         style: const TextStyle(
+  //                           fontSize: 18,
+  //                           fontWeight: FontWeight.bold,
+  //                           color: Colors.black,
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     FittedBox(
+  //                       fit: BoxFit.scaleDown,
+  //                       child: Text(
+  //                         winnerName,
+  //                         style: TextStyle(
+  //                           fontFamily: 'NotoSansJP',
+  //                           fontSize: 18,
+  //                           fontWeight: FontWeight.w500,
+  //                           color: Colors.black,
+  //                         ),
+  //                         textAlign: TextAlign.center,
+  //                       ),
+  //                     ),
+  //
+  //                     // Scrollable content
+  //                     Expanded(
+  //                       child: SingleChildScrollView(
+  //                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+  //                         child: Column(
+  //                           crossAxisAlignment: CrossAxisAlignment.stretch,
+  //                           children: [
+  //                             // Base points (always visible)
+  //                             TextField(
+  //                               controller: pointsCtrl,
+  //                               keyboardType: TextInputType.number,
+  //                               decoration: const InputDecoration(
+  //                                 labelText: '点数（基本）',
+  //                                 hintText: 'ロン / 親ツモ',
+  //                               ),
+  //                             ),
+  //
+  //                             // Extra field appears ONLY when ツモ selected AND winner is NOT dealer
+  //                             if (selected == 'tsumo' && !isWinnerDealer) ...[
+  //                               const SizedBox(height: 12),
+  //                               TextField(
+  //                                 controller: tsumoDealerCtrl,
+  //                                 keyboardType: TextInputType.number,
+  //                                 decoration: InputDecoration(
+  //                                   labelText: '点数',
+  //                                   hintText: '親が支払う点数',
+  //                                 ),
+  //                               ),
+  //                             ],
+  //
+  //                             const SizedBox(height: 48),
+  //                             // Radios: other seats + ツモ
+  //                             const Text(
+  //                               '支払い元',
+  //                               style: TextStyle(color: Colors.black),
+  //                             ),
+  //                             ...seatWind.entries
+  //                                 .where(
+  //                                   (e) => e.key != winnerSeat,
+  //                                 ) // exclude winner
+  //                                 .map(
+  //                                   (e) => RadioListTile<String>(
+  //                                     title: Text(e.value), // wind (東南西北)
+  //                                     value: e.key, // seatPos
+  //                                     groupValue: selected,
+  //                                     onChanged: (v) =>
+  //                                         setState(() => selected = v),
+  //                                   ),
+  //                                 ),
+  //                             RadioListTile<String>(
+  //                               title: const Text('ツモ'),
+  //                               value: 'tsumo',
+  //                               groupValue: selected,
+  //                               onChanged: (v) => setState(() => selected = v),
+  //                             ),
+  //                           ],
+  //                         ),
+  //                       ),
+  //                     ),
+  //
+  //                     // Buttons pinned at bottom
+  //                     Padding(
+  //                       padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+  //                       child: Row(
+  //                         mainAxisAlignment: MainAxisAlignment.end,
+  //                         children: [
+  //                           TextButton(
+  //                             onPressed: () => Navigator.pop(context),
+  //                             child: const Text('キャンセル'),
+  //                           ),
+  //                           TextButton(
+  //                             onPressed: () {
+  //                               final base = int.tryParse(pointsCtrl.text);
+  //                               if (selected == null || base == null) return;
+  //
+  //                               if (selected == 'tsumo') {
+  //                                 // ツモ
+  //                                 final payload = <String, dynamic>{
+  //                                   'mode': 'tsumo',
+  //                                   'base': base,
+  //                                 };
+  //                                 if (!isWinnerDealer) {
+  //                                   // needs dealer amount
+  //                                   final dealerAmt = int.tryParse(
+  //                                     tsumoDealerCtrl.text ?? '',
+  //                                   );
+  //                                   if (dealerAmt == null)
+  //                                     return; // invalid; do nothing
+  //                                   payload['dealer'] = dealerAmt;
+  //                                 }
+  //                                 Navigator.pop(context, payload);
+  //                               } else {
+  //                                 // RON vs selected loser seat
+  //                                 Navigator.pop(context, {
+  //                                   'mode': 'ron',
+  //                                   'base': base,
+  //                                   'loser': selected, // seatPos
+  //                                 });
+  //                               }
+  //                             },
+  //                             child: const Text('OK'),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         );
+  //       },
+  //     );
+  //
+  //     void _advanceRound() {
+  //       final m = RegExp(r'([東南西北])(\d)局').firstMatch(currentRound);
+  //       String wind = m?.group(1) ?? '東';
+  //       int num = int.tryParse(m?.group(2) ?? '1') ?? 1;
+  //
+  //       if (num < 4) {
+  //         num += 1;
+  //       } else {
+  //         wind = _nextWind(wind);
+  //         num = 1;
+  //       }
+  //       currentRound = '$wind${num}局';
+  //     }
+  //
+  //     void _processScoringRon({
+  //       required String winnerSeat, // 'bottom'|'right'|'top'|'left'
+  //       required int points,
+  //       required String loserSeat, // seatPos
+  //     }) {
+  //       final dealer = dealerSeat;
+  //       final dealerWon = (winnerSeat == dealer);
+  //
+  //       setState(() {
+  //         // Winner gets points + all riichi sticks
+  //         final bonus = riichiSticks * 1000;
+  //         scores[winnerSeat] = (scores[winnerSeat] ?? 0) + points + bonus;
+  //
+  //         // Loser pays points
+  //         scores[loserSeat] = (scores[loserSeat] ?? 0) - points;
+  //
+  //         // Reset riichi
+  //         riichiSticks = 0;
+  //         riichiStatus.updateAll((k, v) => false);
+  //
+  //         // Round/dealer rules
+  //         if (dealerWon) {
+  //           honba += 1; // same 局, dealer stays
+  //         } else {
+  //           honba = 0;
+  //           _advanceRound();
+  //           _rotateWindsClockwise(); // dealer passes clockwise
+  //         }
+  //       });
+  //
+  //       _saveData();
+  //     }
+  //
+  //     void _processScoringTsumo({
+  //       required String winnerSeat,
+  //       required int baseForNonDealerOrAll,
+  //       int? dealerAmountIfNonDealerWins, // null when winner is dealer
+  //     }) {
+  //       final dealer = dealerSeat;
+  //       final winnerIsDealer = (winnerSeat == dealer);
+  //
+  //       // Build payer sets
+  //       final others = [
+  //         'bottom',
+  //         'right',
+  //         'top',
+  //         'left',
+  //       ].where((s) => s != winnerSeat).toList();
+  //
+  //       setState(() {
+  //         int totalTaken = 0;
+  //
+  //         if (winnerIsDealer) {
+  //           // All three others pay the same "base"
+  //           for (final seat in others) {
+  //             scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+  //             totalTaken += baseForNonDealerOrAll;
+  //           }
+  //         } else {
+  //           // Winner is NOT dealer:
+  //           // Two non-dealers (excluding dealer and winner) pay "base"
+  //           final nonDealerLosers = others.where((s) => s != dealer).toList();
+  //           for (final seat in nonDealerLosers) {
+  //             scores[seat] = (scores[seat] ?? 0) - baseForNonDealerOrAll;
+  //             totalTaken += baseForNonDealerOrAll;
+  //           }
+  //           // Dealer pays "dealerAmount"
+  //           final dealerPay = dealerAmountIfNonDealerWins ?? 0;
+  //           scores[dealer] = (scores[dealer] ?? 0) - dealerPay;
+  //           totalTaken += dealerPay;
+  //         }
+  //
+  //         // Winner collects everything + riichi bonus
+  //         final bonus = riichiSticks * 1000;
+  //         scores[winnerSeat] = (scores[winnerSeat] ?? 0) + totalTaken + bonus;
+  //
+  //         // Reset riichi
+  //         riichiSticks = 0;
+  //         riichiStatus.updateAll((k, v) => false);
+  //
+  //         // Round/dealer rules:
+  //         if (winnerIsDealer) {
+  //           honba += 1; // dealer win → same 局
+  //         } else {
+  //           honba = 0;
+  //           _advanceRound();
+  //           _rotateWindsClockwise();
+  //         }
+  //       });
+  //
+  //       _saveData();
+  //     }
+  //
+  //     if (result == null) return;
+  //
+  //     // Route to handler
+  //     final mode = result['mode'] as String;
+  //     if (mode == 'ron') {
+  //       _processScoringRon(
+  //         winnerSeat: winnerSeat,
+  //         points: result['base'] as int,
+  //         loserSeat: result['loser'] as String,
+  //       );
+  //     } else {
+  //       // tsumo
+  //       final base = result['base'] as int;
+  //       final dealerAmt = result.containsKey('dealer')
+  //           ? result['dealer'] as int
+  //           : null;
+  //       _processScoringTsumo(
+  //         winnerSeat: winnerSeat,
+  //         baseForNonDealerOrAll: base,
+  //         dealerAmountIfNonDealerWins: dealerAmt, // null when winner is dealer
+  //       );
+  //     }
+  //   }
+  //
+  //   return Transform.rotate(
+  //     angle: contentRotation,
+  //     child: GestureDetector(
+  //       onTap: () => _enterScoringMode(seatPos),
+  //       child: Container(
+  //         decoration: BoxDecoration(
+  //           gradient: isDealer
+  //               ? const LinearGradient(
+  //                   colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+  //                   begin: Alignment.topLeft,
+  //                   end: Alignment.bottomRight,
+  //                 )
+  //               : null,
+  //           color: isDealer ? null : const Color(0xFF2A2A2A),
+  //           borderRadius: BorderRadius.circular(12),
+  //           boxShadow: [
+  //             BoxShadow(
+  //               color: Colors.black.withOpacity(0.3),
+  //               blurRadius: 8,
+  //               offset: const Offset(0, 4),
+  //             ),
+  //           ],
+  //           border: isDealer
+  //               ? Border.all(color: const Color(0xFFFFD700), width: 2)
+  //               : null,
+  //         ),
+  //         child: LayoutBuilder(
+  //           builder: (context, constraints) {
+  //             // Use real constraints, not screen width, to size inner content
+  //             final cardW = constraints.maxWidth;
+  //             final cardH = constraints.maxHeight;
+  //
+  //             // Your padding is 2% of card width on all sides
+  //             final pad = cardW * 0.02;
+  //             final innerH = (cardH - pad * 2).clamp(0.0, double.infinity);
+  //             final innerW = (cardW - pad * 2).clamp(0.0, double.infinity);
+  //
+  //             // Keep your visual scales based on height like before
+  //             final seatFont = cardH * 0.7;
+  //             final scoreFont = cardH * 0.4;
+  //             final barW = innerW * 0.6;
+  //             final barH = barW / 20;
+  //
+  //             final windLabel = seatWind[seatPos] ?? '東';
+  //
+  //             return Padding(
+  //               padding: EdgeInsets.all(pad),
+  //               child: Row(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 crossAxisAlignment: CrossAxisAlignment.center,
+  //                 children: [
+  //                   // Seat label
+  //                   Container(
+  //                     width: seatFont * 1.4,
+  //                     height: seatFont * 1.4,
+  //                     // decoration: BoxDecoration(
+  //                     //   border: Border.all(color: Colors.red, width: 2),
+  //                     // ),
+  //                     alignment: Alignment.center,
+  //                     child: Text(
+  //                       windLabel,
+  //                       style: TextStyle(
+  //                         fontFamily: 'NotoSansJP',
+  //                         fontSize: seatFont,
+  //                         fontWeight: FontWeight.bold,
+  //                         color: Colors.white,
+  //                         height: 1.0,
+  //                       ),
+  //                     ),
+  //                   ),
+  //                   SizedBox(width: cardW * 0.05),
+  //                   // Right side content
+  //                   Expanded(
+  //                     child: SizedBox(
+  //                       height: innerH,
+  //                       child: Column(
+  //                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                         crossAxisAlignment: CrossAxisAlignment.center,
+  //                         children: [
+  //                           // Player name
+  //                           GestureDetector(
+  //                             behavior: HitTestBehavior.opaque,
+  //                             // ensure this area captures the tap
+  //                             onTap: () => _editPlayerName(seatPos),
+  //                             child: FittedBox(
+  //                               fit: BoxFit.scaleDown,
+  //                               child: Text(
+  //                                 names[seatPos] ?? '',
+  //                                 style: TextStyle(
+  //                                   fontFamily: 'NotoSansJP',
+  //                                   fontSize: scoreFont * 0.25,
+  //                                   // slightly smaller than score
+  //                                   fontWeight: FontWeight.w500,
+  //                                   color: Colors.white70,
+  //                                 ),
+  //                                 textAlign: TextAlign.center,
+  //                               ),
+  //                             ),
+  //                           ),
+  //                           // Score
+  //                           FittedBox(
+  //                             fit: BoxFit.scaleDown,
+  //                             child: Text(
+  //                               '${scores[seatPos] ?? 0}',
+  //                               style: TextStyle(
+  //                                 fontFamily: 'NotoSansJP',
+  //                                 fontSize: scoreFont,
+  //                                 fontWeight: FontWeight.bold,
+  //                                 color: Colors.white,
+  //                               ),
+  //                               textAlign: TextAlign.center,
+  //                             ),
+  //                           ),
+  //                           // Riichi bar
+  //                           GestureDetector(
+  //                             onTap: () => _toggleRiichi(seatPos),
+  //                             child: AnimatedOpacity(
+  //                               duration: const Duration(milliseconds: 150),
+  //                               opacity: (riichiStatus[seatPos] ?? false)
+  //                                   ? 1.0
+  //                                   : 0.3,
+  //                               child: Container(
+  //                                 width: barW,
+  //                                 height: barH,
+  //                                 decoration: BoxDecoration(
+  //                                   color: const Color(0xFFFFFFFF),
+  //                                   borderRadius: BorderRadius.circular(4),
+  //                                   border: (riichiStatus[seatPos] ?? false)
+  //                                       ? Border.all(
+  //                                           color: Colors.white,
+  //                                           width: 2,
+  //                                         )
+  //                                       : null,
+  //                                 ),
+  //                                 child: Center(
+  //                                   child: Container(
+  //                                     width: barH * 0.7,
+  //                                     height: barH * 0.7,
+  //                                     decoration: const BoxDecoration(
+  //                                       shape: BoxShape.circle,
+  //                                       color: Color(0xFFFF0000),
+  //                                     ),
+  //                                   ),
+  //                                 ),
+  //                               ),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 }
