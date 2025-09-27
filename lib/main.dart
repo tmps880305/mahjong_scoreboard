@@ -595,7 +595,33 @@ class _ScoreboardScreenState extends State<ScoreboardScreen> {
                             ),
                             TextButton(
                               onPressed: () {
-                                // your existing OK logic
+                                final base = int.tryParse(pointsCtrl.text);
+                                if (selected == null || base == null) return;
+
+                                if (selected == 'tsumo') {
+                                  // ツモ
+                                  final payload = <String, dynamic>{
+                                    'mode': 'tsumo',
+                                    'base': base,
+                                  };
+                                  if (!isWinnerDealer) {
+                                    // needs dealer amount
+                                    final dealerAmt = int.tryParse(
+                                      tsumoDealerCtrl.text ?? '',
+                                    );
+                                    if (dealerAmt == null)
+                                      return; // invalid; do nothing
+                                    payload['dealer'] = dealerAmt;
+                                  }
+                                  Navigator.pop(context, payload);
+                                } else {
+                                  // RON vs selected loser seat
+                                  Navigator.pop(context, {
+                                    'mode': 'ron',
+                                    'base': base,
+                                    'loser': selected, // seatPos
+                                  });
+                                }
                               },
                               child: const Text('OK'),
                             ),
